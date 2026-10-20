@@ -8,7 +8,6 @@ using namespace geode::prelude;
 bool ObjectBatchNode::init() {
     auto renderer = Renderer::get();
     spriteSheetTexture = renderer->getSpriteSheetTexture(layerId.spriteSheet);
-    drawCall = renderer->getObjectBatch().getDrawCall(layerId);
     return true;
 }
 

@@ -26,7 +26,6 @@ public:
     }
 
 private:
-    ObjectBatch::LayerDrawCall* drawCall;
     LayerKey layerId;
     cocos2d::CCTexture2D* spriteSheetTexture;
 };

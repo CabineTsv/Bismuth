@@ -8,7 +8,6 @@
 #include "HotKey.hpp"
 #include "ObjectBatchNode.hpp"
 #include "SpriteMeshDictionary.hpp"
-#include "VisibilityManager.hpp"
 #include "ccTypes.h"
 #include "common.hpp"
 #include "glm/fwd.hpp"
@@ -208,6 +207,9 @@ void Renderer::generateBatchNodes() {
         auto batchNode = ObjectBatchNode::create(id);
         if (batchNode) {
             auto node = getSpriteBatchNodeWithLayerId(id);
+
+            if (!node)
+                continue;
 
             layer->m_objectLayer->addChild(batchNode, node->getZOrder());
             batchNodes.push_back(batchNode);
@@ -419,8 +421,6 @@ float CAMERA_CULL_RECT_SCALE = 1.3;
 
 void Renderer::draw() {
     PROFILER_PUSH("Renderer::draw");
-
-    auto timer = BProfiler::start("Renderer::draw");
     
     if (debugTextEnabled) {
         glBeginQuery(GL_TIME_ELAPSED, timeElapsedQuery);
@@ -434,9 +434,9 @@ void Renderer::draw() {
     if (!isPaused()) {
         prepareColorChannelBuffer();
     
-        auto timer = BProfiler::start("Generate group state buffer");
+        // auto timer = BProfiler::start("Generate group state buffer");
         groupManager.prepareGroupStateBuffer();
-        timer.end();
+        // timer.end();
 
         // glm::vec2 bl = view.bottomLeft;
         // glm::vec2 br = view.bottomLeft + view.rightVector;
@@ -451,7 +451,7 @@ void Renderer::draw() {
         objectBatch.predraw();
     }
 
-    timer.end();
+    renderingTimer.start();
 
     /*
     glm::vec2 normal { glm::cos(glm::radians(lineAngle)), glm::sin(glm::radians(lineAngle)) };
@@ -498,6 +498,8 @@ void Renderer::draw() {
 }
 
 void Renderer::finish() {
+    renderingTimer.stop();
+
     if (debugTextEnabled) {
         renderTime = 0;
         glEndQuery(GL_TIME_ELAPSED);
@@ -699,40 +701,49 @@ static i32 storedBlendDstAlpha, storedBlendDstRGB;
 static i32 storedTextures[9];
 
 void storeGLStates() {
+    PROFILER_PUSH("storeGLStates");
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &storedVAO);
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &storedVBO);
-    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &storedIBO);
-    glGetIntegerv(GL_CURRENT_PROGRAM, &storedProgram);
+    // glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &storedVBO);
+    // glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &storedIBO);
     glGetIntegerv(GL_CURRENT_PROGRAM, &storedProgram);
     
-    glGetIntegerv(GL_BLEND_SRC_ALPHA, &storedBlendSrcAlpha);
-    glGetIntegerv(GL_BLEND_SRC_RGB,   &storedBlendSrcRGB);
-    glGetIntegerv(GL_BLEND_DST_ALPHA, &storedBlendDstAlpha);
-    glGetIntegerv(GL_BLEND_DST_RGB,   &storedBlendDstRGB);
+    // glGetIntegerv(GL_BLEND_SRC_ALPHA, &storedBlendSrcAlpha);
+    // glGetIntegerv(GL_BLEND_SRC_RGB,   &storedBlendSrcRGB);
+    // glGetIntegerv(GL_BLEND_DST_ALPHA, &storedBlendDstAlpha);
+    // glGetIntegerv(GL_BLEND_DST_RGB,   &storedBlendDstRGB);
 
+    /*
     for (int i = 0; i < 9; i++) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glGetIntegerv(GL_TEXTURE_BINDING_2D, storedTextures + i);
     }
     glActiveTexture(GL_TEXTURE0);
+    */
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, storedTextures);
+    glActiveTexture(GL_TEXTURE0);
+    PROFILER_POP();
 }
 
 void restoreGLStates() {
+    PROFILER_PUSH("restoreGLStates");
     glBindVertexArray(storedVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, storedVBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, storedIBO);
+    // glBindBuffer(GL_ARRAY_BUFFER, storedVBO);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, storedIBO);
     glUseProgram(storedProgram);
 
+    /*
     glBlendFuncSeparate(
         storedBlendSrcRGB,
         storedBlendDstRGB,
         storedBlendSrcAlpha,
         storedBlendDstAlpha
     );
+    */
 
+    /*
     for (int i = 0; i < 9; i++) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, storedTextures[i]);
     }
     glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE0);
+    */
+    glBindTexture(GL_TEXTURE_2D, *storedTextures);
+    PROFILER_POP();
 }

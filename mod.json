@@ -35,7 +35,7 @@
 			"default": true
 		},
 		"ingame_enable": {
-			"name": "In-game enable/disable",
+			"name": "Enable debug tools",
 			"type": "bool",
 			"default": false,
 			"description": "Allows you to enable and disable Bismuth while playing by pressing F8. It also allows you to use Difference Mode by pressing F9 (Difference Mode is very unstable).\n\n WARNING: This option effectively removes any optimization."

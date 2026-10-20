@@ -98,10 +98,21 @@ UPtr<SortedObjectBatch> ObjectSpriteSorter::generateSortedBatch() {
         return nullptr;
     }
 
+    std::vector<DrawCommand> drawCommands;
+    drawCommands.resize(workGroups.size());
+
+    for (auto& cmd : drawCommands) {
+        cmd.baseInstance = 0;
+        cmd.baseVertex = 0;
+        cmd.instanceCount = 1;
+    }
+
     Buffer* drawCommandBuffer = Buffer::createGPUExclusive(
         "Draw command buffer",
-        workGroups.size() * sizeof(int) * 5
+        workGroups.size() * sizeof(DrawCommand)
     );
+
+    drawCommandBuffer->write(drawCommands.data(), drawCommandBuffer->getSize());
 
     return std::make_unique<SortedObjectBatch>(
         spriteRemapBuffer,
@@ -143,8 +154,8 @@ void ObjectSpriteSorter::generateWorkGroupsForLayer(
         // log::info("  - Work group {} = (index={}, count={}), {}", workGroupsOut.size(), startIndex, endIndex - startIndex, culledOutputIndex);
 
         workGroupsOut.push_back({
-            .inputSpriteIndex = startIndex,
-            .inputSpriteCount = endIndex - startIndex,
+            .inputSpriteStart = startIndex,
+            .inputSpriteEnd   = endIndex,
             .culledIndexBufferOutputIndex = culledOutputIndex
         });
     }

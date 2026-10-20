@@ -5,8 +5,8 @@
     can be found inside the input sprite buffer.
 */
 struct WorkGroup {
-    uint inputSpriteIndex;
-    uint inputSpriteCount;
+    uint inputSpriteStart;
+    uint inputSpriteEnd;
     // This tells the compute shader where to output the indicies in the culled index buffer
     uint culledIndexBufferOutputIndex;
 };

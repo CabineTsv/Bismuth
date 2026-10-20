@@ -15,6 +15,8 @@ class $modify(MyGJBaseGameLayer, GJBaseGameLayer) {
     */
 };
 
+/*
+
 DECLARE_HOTKEY(enumKeyCodes::KEY_A, {
     auto sfn = CCSpriteFrameCache::sharedSpriteFrameCache()->spriteFrameByName("d_wheel_01_001.png");
 
@@ -175,8 +177,6 @@ DECLARE_HOTKEY(enumKeyCodes::KEY_M, {
 
     auto result = file::writeToJson("./object.json", objectsJson);
 })
-
-/*
 
 static bool decompEnabled = false;
 

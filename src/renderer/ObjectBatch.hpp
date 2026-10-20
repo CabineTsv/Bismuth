@@ -6,11 +6,11 @@
 #include <vector>
 
 #include "Buffer.hpp"
-#include "VisibilityManager.hpp"
 #include "glm/fwd.hpp"
 #include "math/ConvexList.hpp"
 #include "ObjectUtils.hpp"
 #include "ObjectSpriteSorter.hpp"
+#include "../utils/GPUTimer.hpp"
 
 using namespace geode;
 
@@ -74,14 +74,6 @@ struct SpriteVertexTransforms {
 
 class ObjectBatch {
 public:
-    struct LayerDrawCall {
-        LayerKey id;
-        VisibilityManager::Layer layer;
-        u32 startIndex;
-        u32 indexCount;
-    };
-
-public:
     inline ObjectBatch(Renderer& renderer)
         : renderer(renderer) {}
     ~ObjectBatch();
@@ -131,14 +123,10 @@ public:
     }
 
     inline const std::set<LayerKey>& getUsedLayerIds() {
-        return usedLayerKeys;//visibilityManager.getUsedLayerIds();
+        return usedLayerKeys;
     }
 
     void predraw();
-
-    LayerDrawCall* getDrawCall(const LayerKey& id);
-
-    void draw(LayerDrawCall* drawCall);
 
     void prepareCullingComputeShader();
 
@@ -148,19 +136,19 @@ private:
 private:
     Renderer& renderer;
 
-    // Manages which objects are visible
-    // VisibilityManager visibilityManager;
-
     SpriteSheet spriteSheetFilter = (SpriteSheet)-1;
 
     // Static buffers
     Buffer* vertexBuffer = nullptr;
     Buffer* indexBuffer = nullptr;
     Buffer* inputSpriteBuffer = nullptr;
+    Buffer* preCulledSpritesBuffer = nullptr;
 
     // GPU buffers
     Buffer* rawSpriteBuffer = nullptr;
     Buffer* culledIndexBuffer = nullptr;
+
+    GPUTimer cullingComputeShaderTimer { "Culling compute shader time" };
 
     u32 vao = 0;
 
@@ -174,11 +162,7 @@ private:
     u32 indexCount = 0;
 
     std::vector<InputSprite> inputSprites;
-    
-    std::vector<u32> culledIndicies;
-    u32 culledIndexCount = 0;
-
-    std::vector<LayerDrawCall> layerDrawCalls;
+    std::vector<PreCulledSprite> preCulledSprites;
 
     std::set<LayerKey> usedLayerKeys;
 

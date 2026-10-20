@@ -24,18 +24,6 @@ STORAGE_BUFFER(SPRITE_REMAP_BUFFER_BINDING) SpriteRemapBuffer {
 
 //// DRAW COMMANDS BUFFER ////
 
-/*
-    This is the structure of the draw command to
-    be executed by glMultiDrawElementsIndirect
-*/
-struct DrawCommand {
-    uint count;
-    uint instanceCount;
-    uint firstIndex;
-    int  baseVertex;
-    uint baseInstance;
-};
-
 STORAGE_BUFFER(DRAW_COMMAND_BUFFER_BINDING) DrawCommandBuffer {
     DrawCommand u_drawCommands[];
 };
@@ -56,19 +44,21 @@ vec4 applyHSV(HSV hsvValue, vec4 color);
 
 //// PROCESS SPRITE FUNCTION ////
 void processSprite(uint spriteIndex) {
-    InputSprite sprite = u_inputSprites[spriteIndex];
-    ObjectInfo object = u_objects[sprite.objectIndex];
-
-    objectIndex = sprite.objectIndex;
+    PreCulledSprite pcSprite = u_preCulledSprites[spriteIndex];
 
     //// APPLY GROUP COMBINATION STATE ////
-    GroupCombinationState state = u_groupCombinationStates[object.groupCombinationIndex];
-    objectPosition = state.positionalTransform * object.startPosition + state.offset;
-
-    objectFlags = object.flags;
+    GroupCombinationState state = u_groupCombinationStates[pcSprite.groupCombinationIndex];
+    objectPosition = state.positionalTransform * pcSprite.startPosition + state.offset;
 
     if (!isObjectOnScreen())
         return;
+
+    InputSprite sprite = u_inputSprites[spriteIndex];
+    objectIndex = sprite.objectIndex;
+    
+    ObjectInfo object = u_objects[sprite.objectIndex];
+
+    objectFlags = object.flags;
 
     //// APPLY LOCAL TRANSFORM ////
     mat2 objectLocalTransform = mat2(1.0);
@@ -128,31 +118,26 @@ void processSprite(uint spriteIndex) {
     }
 }
 
-uniform uint workGroupOffset;
-
 //// MAIN FUNCTION ////
 void main() {
-    uint workGroupIndex = workGroupOffset + gl_WorkGroupID.x;
+    uint workGroupIndex = gl_WorkGroupID.x;
 
     WorkGroup workGroup = u_workGroups[workGroupIndex];
     culledIndexBufferOutputIndex = workGroup.culledIndexBufferOutputIndex;
 
-    uint inputSpriteEnd = workGroup.inputSpriteIndex + workGroup.inputSpriteCount;
-
-    for (uint i = workGroup.inputSpriteIndex; i < inputSpriteEnd; i++)
+    for (uint i = workGroup.inputSpriteStart; i < workGroup.inputSpriteEnd; i++)
         processSprite(u_spriteRemapIndicies[i]);
 
     //// WRITE THE DRAW COMMAND ////
-    u_drawCommands[workGroupIndex].count = culledIndexBufferOutputIndex - workGroup.culledIndexBufferOutputIndex;        
-    u_drawCommands[workGroupIndex].instanceCount = 1;
+    u_drawCommands[workGroupIndex].count = culledIndexBufferOutputIndex - workGroup.culledIndexBufferOutputIndex;
     u_drawCommands[workGroupIndex].firstIndex = workGroup.culledIndexBufferOutputIndex;
-    u_drawCommands[workGroupIndex].baseVertex = 0;
-    u_drawCommands[workGroupIndex].baseInstance = 0;
 }
 
 //// HELPER FUNCTIONS ////
 bool isObjectOnScreen() {
     vec2 offset = objectPosition - u_cameraPosition;
+    // return dot(offset, offset) < 400;
+
     vec2 screenPos = vec2(dot(u_cameraRight, offset), dot(u_cameraUp, offset));
 
     const float leeway = 100;

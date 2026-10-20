@@ -181,6 +181,11 @@ void ObjectBatch::addSprite(
         .indexCount = (u32)indexCount
     });
 
+    preCulledSprites.push_back({
+        .groupCombinationIndex = renderer.getGroupManager().getGroupCombinationIndexForObject(object),
+        .startPosition = ccPointToGLM(object->getStartPos())
+    });
+
     ZLayer zLayer = object->getObjectZLayer();
     SpriteSheet spriteSheet = ObjectUtils::getSpritesheetOfObject(object, type);
 
@@ -215,9 +220,10 @@ void ObjectBatch::finishWriting() {
     vertexCount = verticies.size();
     indexCount  = indicies.size();
 
-    vertexBuffer      = Buffer::createStaticDraw("Object vertex buffer", verticies.data(), vertexCount * sizeof(ObjectVertex));
-    indexBuffer       = Buffer::createStaticDraw("Object index buffer", indicies.data(), indexCount * sizeof(u32));
-    inputSpriteBuffer = Buffer::createStaticDraw("Input sprite buffer", inputSprites.data(), inputSprites.size() * sizeof(InputSprite));
+    vertexBuffer           = Buffer::createStaticDraw("Object vertex buffer", verticies.data(), vertexCount * sizeof(ObjectVertex));
+    indexBuffer            = Buffer::createStaticDraw("Object index buffer", indicies.data(), indexCount * sizeof(u32));
+    inputSpriteBuffer      = Buffer::createStaticDraw("Input sprite buffer", inputSprites.data(), inputSprites.size() * sizeof(InputSprite));
+    preCulledSpritesBuffer = Buffer::createStaticDraw("Pre-culled sprites buffer", preCulledSprites.data(), preCulledSprites.size() * sizeof(PreCulledSprite));
 
     rawSpriteBuffer   = Buffer::createGPUExclusive("Raw sprite buffer", inputSprites.size() * sizeof(RawSprite));
     culledIndexBuffer = Buffer::createGPUExclusive("Culled index buffer", indexCount * sizeof(u32));
@@ -228,7 +234,8 @@ void ObjectBatch::finishWriting() {
     verticies.clear();
     indicies.clear();
     inputSprites.clear();
-    
+    preCulledSprites.clear();
+
     prepareVAO();
     restoreGLStates();
 }
@@ -270,7 +277,8 @@ void ObjectBatch::draw(const LayerKey& layer) {
 
 void ObjectBatch::predraw() {
     PROFILER_PUSH("ObjectBatch::predraw");
-    
+    cullingComputeShaderTimer.start();
+
     Shader* computeShader = renderer.getCullingComputeShader();
 
     computeShader->use();
@@ -284,23 +292,8 @@ void ObjectBatch::predraw() {
 
     glDispatchCompute(sortedBatch->workGroupCount, 1, 1);
 
+    cullingComputeShaderTimer.stop();
     PROFILER_POP();
-}
-
-ObjectBatch::LayerDrawCall* ObjectBatch::getDrawCall(const LayerKey& id) {
-    for (auto& drawCall : layerDrawCalls) {
-        if (drawCall.id == id)
-            return &drawCall;
-    }
-    return nullptr;
-}
-
-void ObjectBatch::draw(LayerDrawCall* drawCall) {
-    if (drawCall == nullptr)
-        return;
-
-    bind();
-    glDrawElements(GL_TRIANGLES, drawCall->indexCount, GL_UNSIGNED_INT, (void*)(drawCall->startIndex * sizeof(u32)));
 }
 
 void ObjectBatch::prepareCullingComputeShader() {
@@ -308,6 +301,7 @@ void ObjectBatch::prepareCullingComputeShader() {
     inputSpriteBuffer->bindAsStorageBuffer(INPUT_SPRITE_BUFFER_BINDING);
     rawSpriteBuffer->bindAsStorageBuffer(RAW_SPRITE_BUFFER_BINDING);
     culledIndexBuffer->bindAsStorageBuffer(CULLED_INDEX_BUFFER_BINDING);
+    preCulledSpritesBuffer->bindAsStorageBuffer(PRE_CULLED_SPRITE_BUFFER_BINDING);
 }
 
 struct AttribTypeInfo {

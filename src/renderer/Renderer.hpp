@@ -4,7 +4,6 @@
 #include <common.hpp>
 #include "Geode/cocos/sprite_nodes/CCSpriteBatchNode.h"
 #include "ObjectBatch.hpp"
-#include "ObjectSorter.hpp"
 #include "ObjectUtils.hpp"
 #include "OverdrawView.hpp"
 #include "Shader.hpp"
@@ -158,6 +157,8 @@ private:
     Ref<cocos2d::CCLabelBMFont> debugText;
     Ref<cocos2d::CCLabelBMFont> debugTextOutline1;
     Ref<cocos2d::CCLabelBMFont> debugTextOutline2;
+
+    GPUTimer renderingTimer { "Rendering time" };
 
     GroupManager groupManager;
 

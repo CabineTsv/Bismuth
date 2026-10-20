@@ -11,11 +11,19 @@
 #define PROFILER_POP()
 #endif
 
+class GPUTimer;
+
 namespace profiler {
+
+extern bool isTakingSnapshot;
 
 void functionPush(const char* name);
 
 void functionPop();
+
+void addTimer(GPUTimer* timer);
+
+void removeTimer(GPUTimer* timer);
 
 };
 

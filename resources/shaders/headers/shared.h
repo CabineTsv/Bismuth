@@ -103,17 +103,18 @@ mat2 scaleMatrix(float scale) {
 //// UNIFORM BUFFERS AND SHADER STORAGE BUFFERS ////
 ////////////////////////////////////////////////////
 
-#define COLOR_CHANNEL_BUFFER_BINDING    0
-#define GROUP_STATE_BUFFER_BINDING      1
-#define OBJECT_INFO_BUFFER_BINDING      2
-#define GAME_STATE_BUFFER_BINDING       3
-#define RAW_SPRITE_BUFFER_BINDING       4
-#define INPUT_SPRITE_BUFFER_BINDING     5
-#define WORK_GROUP_BUFFER_BINDING       6
-#define INPUT_INDEX_BUFFER_BINDING      7
-#define CULLED_INDEX_BUFFER_BINDING     8
-#define DRAW_COMMAND_BUFFER_BINDING     9
-#define SPRITE_REMAP_BUFFER_BINDING     10
+#define COLOR_CHANNEL_BUFFER_BINDING     0
+#define GROUP_STATE_BUFFER_BINDING       1
+#define OBJECT_INFO_BUFFER_BINDING       2
+#define GAME_STATE_BUFFER_BINDING        3
+#define RAW_SPRITE_BUFFER_BINDING        4
+#define INPUT_SPRITE_BUFFER_BINDING      5
+#define WORK_GROUP_BUFFER_BINDING        6
+#define INPUT_INDEX_BUFFER_BINDING       7
+#define CULLED_INDEX_BUFFER_BINDING      8
+#define DRAW_COMMAND_BUFFER_BINDING      9
+#define SPRITE_REMAP_BUFFER_BINDING      10
+#define PRE_CULLED_SPRITE_BUFFER_BINDING 11
 
 #include "colorChannelBuffer.h"
 #include "groupStateBuffer.h"
@@ -122,6 +123,18 @@ mat2 scaleMatrix(float scale) {
 #include "rawSpriteBuffer.h"
 #include "inputSpriteBuffer.h"
 #include "workGroupBuffer.h"
+
+/*
+    This is the structure of the draw command to
+    be executed by glMultiDrawElementsIndirect
+*/
+struct DrawCommand {
+    uint count;
+    uint instanceCount;
+    uint firstIndex;
+    int  baseVertex;
+    uint baseInstance;
+};
 
 #ifndef GLSL
 // Remove the changed alignments

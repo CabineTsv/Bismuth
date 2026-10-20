@@ -5,6 +5,7 @@
 #include "common.hpp"
 #include "profiler.hpp"
 #include "HotKey.hpp"
+#include "utils/GPUTimer.hpp"
 
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/modify/CCDisplayLinkDirector.hpp>
@@ -15,13 +16,15 @@
 
 using namespace geode::prelude;
 
-bool takeSnapshotNextFrame = false;
-bool isTakingSnapshot      = false;
+bool takeSnapshotNextFrame      = false;
+bool profiler::isTakingSnapshot = false;
 
-std::unordered_map<void*, i64> timeSpentInFunction;
+static std::unordered_map<void*, i64> timeSpentInFunction;
 
-i64 lastFunctionTime;
-std::vector<void*> functionCallStack;
+static i64 lastFunctionTime;
+static std::vector<void*> functionCallStack;
+
+static std::set<GPUTimer*> gpuTimers;
 
 DECLARE_HOTKEY(KEY_P, {
     takeSnapshotNextFrame = true;
@@ -32,23 +35,23 @@ class $modify(MyCCDisplayLinkDirector, cocos2d::CCDisplayLinkDirector) {
         u64 processTime = 0;
 
         if (takeSnapshotNextFrame) {
-            isTakingSnapshot = true;
+            profiler::isTakingSnapshot = true;
             takeSnapshotNextFrame = false;
             timeSpentInFunction.clear();
-            glBeginQuery(GL_TIME_ELAPSED, 1);
+            // glBeginQuery(GL_TIME_ELAPSED, 50);
             processTime = getTime();
         }
 
         CCDisplayLinkDirector::mainLoop();
         
-        if (isTakingSnapshot) {
-            isTakingSnapshot = false;
+        if (profiler::isTakingSnapshot) {
+            profiler::isTakingSnapshot = false;
 
             processTime = getTime() - processTime;
 
             i64 gpuTime = 0;
-            glEndQuery(GL_TIME_ELAPSED);
-            glGetQueryObjecti64v(1, GL_QUERY_RESULT, &gpuTime);
+            // glEndQuery(GL_TIME_ELAPSED);
+            // glGetQueryObjecti64v(50, GL_QUERY_RESULT, &gpuTime);
 
             std::vector<std::pair<void*, i64>> functionsTime;
             for (auto pair : timeSpentInFunction)
@@ -65,13 +68,17 @@ class $modify(MyCCDisplayLinkDirector, cocos2d::CCDisplayLinkDirector) {
             i32 functionSumTime = 0;
 
             for (auto [name, time] : functionsTime) {
-                geode::log::info("- {} : {}ms", (const char*)name, (double)time / 1000000.0);
+                log::info("- {} : {}ms", (const char*)name, (double)time / 1000000.0);
                 functionSumTime += time;
             }
 
-            geode::log::info("Functions time sum: {}ms", (double)functionSumTime / 1000000.0);
-            geode::log::info("GPU time: {}ms", (double)gpuTime / 1000000.0);
-            geode::log::info("CPU time: {}ms", (double)processTime / 1000000.0);
+            log::info("Functions time sum: {}ms", (double)functionSumTime / 1000000.0);
+            log::info("CPU time: {}ms", (double)processTime / 1000000.0);
+            log::info("Total GPU time: {}ms", (double)gpuTime / 1000000.0);
+
+            for (auto timer : gpuTimers) {
+                log::info("{}: {}ms", timer->getName(), (double)timer->getTime() / 1000000.0);
+            }
         }
     }
 };
@@ -87,7 +94,7 @@ namespace profiler {
 
 void functionPush(const char* name) {
     auto time = getTime();
-    if (!isTakingSnapshot)
+    if (!profiler::isTakingSnapshot)
         return;
     
     if (!functionCallStack.empty()) 
@@ -99,7 +106,7 @@ void functionPush(const char* name) {
 
 void functionPop() {
     auto time = getTime();
-    if (!isTakingSnapshot)
+    if (!profiler::isTakingSnapshot)
         return;
     
     if (!functionCallStack.empty()) 
@@ -107,6 +114,14 @@ void functionPop() {
     
     functionCallStack.pop_back();
     lastFunctionTime = getTime();
+}
+
+void addTimer(GPUTimer* timer) {
+    gpuTimers.insert(timer);
+}
+
+void removeTimer(GPUTimer* timer) {
+    gpuTimers.erase(timer);
 }
 
 }
