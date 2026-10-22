@@ -33,7 +33,7 @@ static float fullscreenQuad[] = {
 };
 
 u32 fullscreenQuadVAO = 0;
-Buffer* fullscreenQuadVBO = nullptr;
+UPtr<Buffer> fullscreenQuadVBO = nullptr;
 
 void drawFullscreenQuad() {
     if (!fullscreenQuadVAO) {
@@ -56,8 +56,7 @@ class $modify(CommonCCDirector, CCDirector) {
     void purgeDirector() {
         if (fullscreenQuadVAO)
             glDeleteVertexArrays(1, &fullscreenQuadVAO);
-        if (fullscreenQuadVBO)
-            Buffer::destroy(fullscreenQuadVBO);
+        
         fullscreenQuadVAO = 0;
         fullscreenQuadVBO = nullptr;
 

@@ -43,17 +43,13 @@ public:
     void flush(usize offset, usize size);
 
 public:
-    static Buffer* create(const char* name, usize size, GLenum usage);
-
-    inline static void destroy(Buffer* buffer) {
-        delete buffer;
-    }
+    static UPtr<Buffer> create(const char* name, usize size, GLenum usage);
 
     /*
         Buffer to be written to once by the CPU
         and used by the GPU
     */
-    inline static Buffer* createStaticDraw(const char* name, void* data, usize size) {
+    inline static UPtr<Buffer> createStaticDraw(const char* name, void* data, usize size) {
         auto ret = create(name, size, GL_STATIC_DRAW);
         if (data)
             ret->write(data, size);
@@ -64,7 +60,7 @@ public:
         Buffer to be written to many times repeatedly by the CPU
         and used by the GPU
     */
-    inline static Buffer* createDynamicDraw(const char* name, usize size) {
+    inline static UPtr<Buffer> createDynamicDraw(const char* name, usize size) {
         return create(name, size, GL_DYNAMIC_DRAW);
     }
 
@@ -72,14 +68,14 @@ public:
         Buffer to be written to many times repeatedly by the GPU
         and used by the CPU
     */
-    inline static Buffer* createDynamicCopy(const char* name, usize size) {
+    inline static UPtr<Buffer> createDynamicCopy(const char* name, usize size) {
         return create(name, size, GL_DYNAMIC_COPY);
     }
 
     /*
         Buffer to be written to and read from by the GPU exclusively
     */
-    static Buffer* createGPUExclusive(const char* name, usize size) {
+    static UPtr<Buffer> createGPUExclusive(const char* name, usize size) {
         return create(name, size, GL_DYNAMIC_DRAW); // GL_DYNAMIC_DRAW for now
     }
 

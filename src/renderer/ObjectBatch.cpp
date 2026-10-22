@@ -18,10 +18,6 @@ using namespace geode::prelude;
 #define QUAD_TR 3
 
 ObjectBatch::~ObjectBatch() {
-    if (vertexBuffer)
-        Buffer::destroy(vertexBuffer);
-    if (indexBuffer)
-        Buffer::destroy(indexBuffer);
     if (vao)
         glDeleteVertexArrays(1, &vao);
 }
@@ -118,9 +114,11 @@ void ObjectBatch::writeSpriteVertex(glm::vec2 pos) {
     vertex.spriteIndex = currentSpriteIndex;
 }
 
+/*
 void ObjectBatch::writeSpriteIndex(u32 index) {
     indicies.push_back(currentSpriteVertexIndex + index);
 }
+*/
 
 void ObjectBatch::writeSpriteMeshFromConvexList(const ConvexList& list) {
     u32 vertexIndex = 0;
@@ -128,9 +126,9 @@ void ObjectBatch::writeSpriteMeshFromConvexList(const ConvexList& list) {
         writeSpriteVertex(p1);
         writeSpriteVertex(p2);
         writeSpriteVertex(p3);
-        writeSpriteIndex(vertexIndex + 0);
-        writeSpriteIndex(vertexIndex + 1);
-        writeSpriteIndex(vertexIndex + 2);
+        // writeSpriteIndex(vertexIndex + 0);
+        // writeSpriteIndex(vertexIndex + 1);
+        // writeSpriteIndex(vertexIndex + 2);
         vertexIndex += 3;
     });
 }
@@ -146,9 +144,11 @@ void ObjectBatch::addSprite(
     if (object->m_hasNoGlow && type == SpriteType::GLOW)
         return;
 
+    spriteCount++;
+
     prepareSpriteMeshWrite(object, sprite, type, transform);
 
-    usize indexStart = indicies.size();
+    usize trianglesStart = verticies.size() / 3;
 
     ConvexList* spriteMesh = SpriteMeshDictionary::getSpriteMeshForSprite(sprite);
 
@@ -161,30 +161,34 @@ void ObjectBatch::addSprite(
     } else {
         writeSpriteVertex({ 0, 0 });
         writeSpriteVertex({ 1, 0 });
-        writeSpriteVertex({ 0, 1 });
         writeSpriteVertex({ 1, 1 });
+        writeSpriteVertex({ 1, 1 });
+        writeSpriteVertex({ 0, 1 });
+        writeSpriteVertex({ 0, 0 });
 
-        writeSpriteIndex(QUAD_BL);
-        writeSpriteIndex(QUAD_TL);
-        writeSpriteIndex(QUAD_TR);
-        writeSpriteIndex(QUAD_BL);
-        writeSpriteIndex(QUAD_TR);
-        writeSpriteIndex(QUAD_BR);
+        // writeSpriteIndex(QUAD_BL);
+        // writeSpriteIndex(QUAD_TL);
+        // writeSpriteIndex(QUAD_TR);
+        // writeSpriteIndex(QUAD_BL);
+        // writeSpriteIndex(QUAD_TR);
+        // writeSpriteIndex(QUAD_BR);
     }
 
-    usize indexCount = indicies.size() - indexStart;
+    usize trianglesCount = verticies.size() / 3 - trianglesStart;
 
     inputSprites.push_back({
         .objectIndex = (u32)currentSpriteSRBIndex,
         .spriteType = (u32)type,
-        .indexStart = (u32)indexStart,
-        .indexCount = (u32)indexCount
+        .indexStart = (u32)trianglesStart,
+        .indexCount = (u32)trianglesCount
     });
 
+    /*
     preCulledSprites.push_back({
         .groupCombinationIndex = renderer.getGroupManager().getGroupCombinationIndexForObject(object),
         .startPosition = ccPointToGLM(object->getStartPos())
     });
+    */
 
     ZLayer zLayer = object->getObjectZLayer();
     SpriteSheet spriteSheet = ObjectUtils::getSpritesheetOfObject(object, type);
@@ -192,7 +196,7 @@ void ObjectBatch::addSprite(
     usedLayerKeys.insert({zLayer, spriteSheet, false});
     usedLayerKeys.insert({zLayer, spriteSheet, true});
 
-    spriteSorter.addSprite(object, sprite, type, currentSpriteIndex, indexCount);
+    spriteSorter.addSprite(object, sprite, type, currentSpriteIndex, trianglesCount);
 }
 
 void ObjectBatch::writeGameObject(GameObject* object) {
@@ -223,10 +227,10 @@ void ObjectBatch::finishWriting() {
     vertexBuffer           = Buffer::createStaticDraw("Object vertex buffer", verticies.data(), vertexCount * sizeof(ObjectVertex));
     indexBuffer            = Buffer::createStaticDraw("Object index buffer", indicies.data(), indexCount * sizeof(u32));
     inputSpriteBuffer      = Buffer::createStaticDraw("Input sprite buffer", inputSprites.data(), inputSprites.size() * sizeof(InputSprite));
-    preCulledSpritesBuffer = Buffer::createStaticDraw("Pre-culled sprites buffer", preCulledSprites.data(), preCulledSprites.size() * sizeof(PreCulledSprite));
+    // preCulledSpritesBuffer = Buffer::createStaticDraw("Pre-culled sprites buffer", preCulledSprites.data(), preCulledSprites.size() * sizeof(PreCulledSprite));
 
-    rawSpriteBuffer   = Buffer::createGPUExclusive("Raw sprite buffer", inputSprites.size() * sizeof(RawSprite));
-    culledIndexBuffer = Buffer::createGPUExclusive("Culled index buffer", indexCount * sizeof(u32));
+    rawSpriteBuffer   = RawSprites::Buffer::create(getSpriteCount(), GL_DYNAMIC_DRAW, false);
+    culledIndexBuffer = Buffer::createGPUExclusive("Culled index buffer", vertexCount / 3 * sizeof(u32));
 
     spriteSorter.sortForCurrentBlendingStates();
     sortedBatch = spriteSorter.generateSortedBatch();
@@ -234,7 +238,7 @@ void ObjectBatch::finishWriting() {
     verticies.clear();
     indicies.clear();
     inputSprites.clear();
-    preCulledSprites.clear();
+    // preCulledSprites.clear();
 
     prepareVAO();
     restoreGLStates();
@@ -242,6 +246,8 @@ void ObjectBatch::finishWriting() {
 
 typedef void (*PFNGLMULTIDRAWELEMENTSINDIRECTPROC)(GLenum mode, GLenum type, const void * indirect, GLsizei drawcount, GLsizei stride);
 static PFNGLMULTIDRAWELEMENTSINDIRECTPROC glMultiDrawElementsIndirect;
+typedef void (*PFNGLMULTIDRAWARRAYSINDIRECTPROC)(GLenum mode, const void * indirect, GLsizei drawcount, GLsizei stride);
+static PFNGLMULTIDRAWARRAYSINDIRECTPROC glMultiDrawArraysIndirect;
 typedef void (*PFNGLDISPATCHCOMPUTEPROC)(GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z);
 static PFNGLDISPATCHCOMPUTEPROC glDispatchCompute = nullptr;
 
@@ -256,20 +262,23 @@ void ObjectBatch::draw(const LayerKey& layer) {
 
     if (!glMultiDrawElementsIndirect)
         glMultiDrawElementsIndirect = (PFNGLMULTIDRAWELEMENTSINDIRECTPROC)wglGetProcAddress("glMultiDrawElementsIndirect");
+    if (!glMultiDrawArraysIndirect)
+        glMultiDrawArraysIndirect = (PFNGLMULTIDRAWARRAYSINDIRECTPROC)wglGetProcAddress("glMultiDrawArraysIndirect");
 
     sortedBatch->bindBuffers();
     prepareCullingComputeShader();
     renderer.bindCullingComputeShaderBuffers();
     sortedBatch->drawCommandBuffer->bindAs(GL_DRAW_INDIRECT_BUFFER);
     glBindVertexArray(vao);
-    culledIndexBuffer->bindAs(GL_ELEMENT_ARRAY_BUFFER);
+    vertexBuffer->bindAsStorageBuffer(VERTEX_BUFFER_BINDING);
+    // culledIndexBuffer->bindAs(GL_ELEMENT_ARRAY_BUFFER);
+    culledIndexBuffer->bindAsStorageBuffer(CULLED_TRI_INDEX_BUFFER);
 
-    glMultiDrawElementsIndirect(
+    glMultiDrawArraysIndirect(
         GL_TRIANGLES,
-        GL_UNSIGNED_INT,
-        (void*)(range.offset * sizeof(int) * 5),
+        (void*)(range.offset * sizeof(DrawCommand)),
         range.count,
-        sizeof(int) * 5
+        sizeof(DrawCommand)
     );
 
     PROFILER_POP();
@@ -299,9 +308,10 @@ void ObjectBatch::predraw() {
 void ObjectBatch::prepareCullingComputeShader() {
     indexBuffer->bindAsStorageBuffer(INPUT_INDEX_BUFFER_BINDING);
     inputSpriteBuffer->bindAsStorageBuffer(INPUT_SPRITE_BUFFER_BINDING);
-    rawSpriteBuffer->bindAsStorageBuffer(RAW_SPRITE_BUFFER_BINDING);
-    culledIndexBuffer->bindAsStorageBuffer(CULLED_INDEX_BUFFER_BINDING);
-    preCulledSpritesBuffer->bindAsStorageBuffer(PRE_CULLED_SPRITE_BUFFER_BINDING);
+    rawSpriteBuffer->bind();
+    // culledIndexBuffer->bindAsStorageBuffer(CULLED_INDEX_BUFFER_BINDING);
+    culledIndexBuffer->bindAsStorageBuffer(CULLED_TRI_INDEX_BUFFER);
+    // preCulledSpritesBuffer->bindAsStorageBuffer(PRE_CULLED_SPRITE_BUFFER_BINDING);
 }
 
 struct AttribTypeInfo {
@@ -347,8 +357,8 @@ void ObjectBatch::prepareVAO() {
     if (vao == 0)
         glGenVertexArrays(1, &vao);
 
-    glBindVertexArray(vao);
-    vertexBuffer->bindAs(GL_ARRAY_BUFFER);
+    // glBindVertexArray(vao);
+    // vertexBuffer->bindAs(GL_ARRAY_BUFFER);
 
-    OBJECT_VERTEX_ATTRIBUTES(VERTEX_ATTRIBUTE_AS_ATTRIB_POINTER_CALL)
+    // OBJECT_VERTEX_ATTRIBUTES(VERTEX_ATTRIBUTE_AS_ATTRIB_POINTER_CALL)
 }

@@ -3,8 +3,7 @@
 #include <Geode/binding/GameObject.hpp>
 #include <common.hpp>
 #include <span>
-#include "../../resources/shaders/headers/shared.h"
-#include "Buffer.hpp"
+#include "SAOBuffer.hpp"
 
 /*
     Objects can have up to 10 group ids. Alpha, move, rotate
@@ -157,7 +156,7 @@ private:
     // GroupCombinationState struct can be found in resources/shaders/shared.h
     // std::vector<GroupCombinationState> groupStates;
     GroupCombinationState* groupStates;
-    Buffer* groupStateBuffer = nullptr;
+    UPtr<Buffer> groupStateBuffer = nullptr;
 
     std::vector<bool> haveGroupStatesScaled;
 

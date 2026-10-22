@@ -19,6 +19,7 @@
 #include <Geode/binding/RingObject.hpp>
 #include <BProfiler.hpp>
 #include "profiler.hpp"
+#include "ObjectSorter.hpp"
 
 using namespace geode::prelude;
 
@@ -74,7 +75,8 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
 
     groupManager.initWithObjects(levelObjects);
 
-    // ObjectSorter sorter;
+    ObjectSorter sorter;
+    sorter.initForGameLayer(layer);
 
     std::vector<GameObject*> objects;
 
@@ -108,8 +110,11 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
         if (object->getHasRotateAction())
             DEBUG_LOG("  - rotationDelta: {}", ((EnhancedGameObject*)object)->m_rotationDelta);
 
-        objects.push_back(object);
+        sorter.addGameObject(object);
     }
+
+    for (auto it = sorter.iterator(); !it.isEnd(); it.next())
+        objects.push_back(it.get());
 
     log::info("Generating static rendering buffer....");
 
@@ -132,18 +137,26 @@ bool Renderer::init(PlayLayer* layer, CCArray* levelObjects) {
     objectBatch.finishWriting();
     generateBatchNodes();
 
-    log::info("Compiling shaders...");
+    log::info("Sprite count: {}", objectBatch.getSpriteCount());
 
     std::map<std::string, std::string> shaderMacroVariables;
-
     shaderMacroVariables["TOTAL_OBJECT_COUNT"] = std::to_string(renderedGameObjectCount == 0 ? 1 : renderedGameObjectCount);
     shaderMacroVariables["GROUP_ID_LIMIT"]     = std::to_string(groupCombCount);
+    shaderMacroVariables["TOTAL_SPRITE_COUNT"] = std::to_string(objectBatch.getSpriteCount());
 
+    log::info("Compiling shaders...");
     shader = Shader::create("objectDrawing.vert", "objectDrawing.frag", shaderMacroVariables);
     if (!shader)
         return false;
 
+    log::info("Compiled objectDrawing shader");
+
     cullingComputeShader = Shader::createCompute("objectCulling.comp", shaderMacroVariables);
+
+    if (!cullingComputeShader)
+        return false;
+
+    log::info("Compiled objectCulling shader");
 
     colorChannelBufferObject = Buffer::createDynamicDraw("Color channel buffer", sizeof(ColorChannelBuffer));
     if (!colorChannelBufferObject)
@@ -219,26 +232,6 @@ void Renderer::generateBatchNodes() {
 
 void Renderer::terminate() {
     glDeleteQueries(1, &timeElapsedQuery);
-
-    if (shader)
-        Shader::destroy(shader);
-    shader = nullptr;
-
-    if (basicShader)
-        Shader::destroy(basicShader);
-    basicShader = nullptr;
-
-    if (colorChannelBufferObject) {
-        colorChannelBufferObject->unmap();
-        Buffer::destroy(colorChannelBufferObject);
-    }
-
-    if (srbBuffer)
-        Buffer::destroy(srbBuffer);
-
-    if (gameStateBuffer)
-        Buffer::destroy(gameStateBuffer);
-
     currentRenderer = nullptr;
     log::info("Renderer terminated");
 }
@@ -279,7 +272,7 @@ void Renderer::prepareShaderUniforms() {
     gameState.u_cameraRight = glm::normalize(cameraRight);
     gameState.u_cameraUp    = glm::normalize(cameraUp);
 
-    gameState.u_cameraSize = { glm::length(cameraRight), glm::length(cameraUp) };
+    gameState.u_cameraSize = glm::vec2 { glm::length(cameraRight), glm::length(cameraUp) };
 
     gameState.u_gameStateFlags = 0;
     if (layer->m_player1->m_isDead)
@@ -346,7 +339,6 @@ void Renderer::generateStaticRenderingBuffer(std::vector<GameObject*>& objects) 
     for (auto object : objects) {
         auto objectInfo = &objectInfos[index];
 
-        objectInfo->startPosition = ccPointToGLM(object->m_startPosition);
         if (object->getHasRotateAction())
             objectInfo->rotationSpeed = ((EnhancedGameObject*)object)->m_rotationDelta; // 'rotationDelta' is incorrect naming
         else
@@ -380,8 +372,6 @@ void Renderer::generateStaticRenderingBuffer(std::vector<GameObject*>& objects) 
         }
 
         objectInfo->opacity = (object->m_opacityMod2 > 0.0) ? object->m_opacityMod2 : 1.0;
-
-        objectInfo->groupCombinationIndex = groupManager.getGroupCombinationIndexForObject(object);
 
         if (object->m_isInvisibleBlock) objectInfo->flags |= OBJECT_FLAG_IS_INVISIBLE_BLOCK;
         if (object->m_customGlowColor)  objectInfo->flags |= OBJECT_FLAG_SPECIAL_GLOW_COLOR;
@@ -569,7 +559,7 @@ Shader* Renderer::prepareDraw() {
     storeGLStates();
     shader->use();
     PROFILER_POP();
-    return shader;
+    return shader.get();
 }
 
 void Renderer::finishDraw() {
@@ -648,7 +638,7 @@ void Renderer::drawLine(const glm::vec2& p1, const glm::vec2& p2, const glm::vec
         return;
 
     glm::vec2 data[2] = { p1, p2 };
-    Buffer* buffer = Buffer::createStaticDraw("Line buffer", &data, sizeof(data));
+    auto buffer = Buffer::createStaticDraw("Line buffer", &data, sizeof(data));
     if (!buffer) return;
     buffer->bindAs(GL_ARRAY_BUFFER);
 
@@ -672,7 +662,6 @@ void Renderer::drawLine(const glm::vec2& p1, const glm::vec2& p2, const glm::vec
     glDrawArrays(GL_LINES, 0, 2);
 
     glDeleteVertexArrays(1, &vao);
-    Buffer::destroy(buffer);
 }
 
 DECLARE_HOTKEY(KEY_F3, {

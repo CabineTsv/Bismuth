@@ -14,9 +14,8 @@
     Rendering info of an object that never changes.
 */
 struct ObjectInfo {
-    vec2 startPosition;
     float rotationSpeed;
-    // Flags are the macro variables beginning with OBJECT_FLAG_*
+// Flags are the macro variables beginning with OBJECT_FLAG_*
     int flags;
     float audioScaleMin;
     float audioScaleMax;
@@ -26,7 +25,6 @@ struct ObjectInfo {
     HSV baseHSV;
     uint detailColorChannelId;
     HSV detailHSV;
-    uint groupCombinationIndex;
 };
 
 /*

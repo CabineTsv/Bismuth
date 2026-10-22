@@ -5,7 +5,7 @@
 #include <Geode/binding/GameObject.hpp>
 #include <common.hpp>
 #include <functional>
-#include "../../resources/shaders/headers/shared.h"
+#include "renderer/SAOBuffer.hpp"
 
 enum class SpriteType {
     BASE   = 0,

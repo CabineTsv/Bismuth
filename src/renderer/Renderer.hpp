@@ -13,7 +13,7 @@
 #include "DifferenceMode.hpp"
 #include "GroupManager.hpp"
 #include "ObjectBatchNode.hpp"
-#include "../../resources/shaders/headers/shared.h"
+#include "SAOBuffer.hpp"
 
 using namespace geode;
 
@@ -107,7 +107,7 @@ public:
     inline ObjectBatch& getObjectBatch() { return objectBatch; }
 
     inline Shader* getCullingComputeShader() const {
-        return cullingComputeShader;
+        return cullingComputeShader.get();
     }
 
     bool useOptimizations();
@@ -163,17 +163,17 @@ private:
     GroupManager groupManager;
 
     ObjectBatch objectBatch;
-    Shader* shader = nullptr;
-    Shader* basicShader = nullptr;
-    Shader* cullingComputeShader = nullptr;
+    UPtr<Shader> shader = nullptr;
+    UPtr<Shader> basicShader = nullptr;
+    UPtr<Shader> cullingComputeShader = nullptr;
 
     ColorChannelBuffer* colorChannelBuffer;
-    Buffer* colorChannelBufferObject = nullptr;
+    UPtr<Buffer> colorChannelBufferObject = nullptr;
 
-    Buffer* srbBuffer = nullptr;
+    UPtr<Buffer> srbBuffer = nullptr;
 
     GameStateBuffer gameState;
-    Buffer* gameStateBuffer = nullptr;
+    UPtr<Buffer> gameStateBuffer = nullptr;
 
     bool differenceModeEnabled = false;
     DifferenceMode differenceMode;

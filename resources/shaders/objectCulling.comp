@@ -43,15 +43,19 @@ vec4 calculateInvisibleBlockColorAndOpacity(vec4 color);
 vec4 applyHSV(HSV hsvValue, vec4 color);
 
 //// PROCESS SPRITE FUNCTION ////
-void processSprite(uint spriteIndex) {
-    PreCulledSprite pcSprite = u_preCulledSprites[spriteIndex];
+void processSprite(uint preCulledSpriteIndex) {
+    vec2 startPosition         = PreCulledSprites.startPosition[preCulledSpriteIndex];
+    uint groupCombinationIndex = PreCulledSprites.groupCombinationIndex[preCulledSpriteIndex];
 
     //// APPLY GROUP COMBINATION STATE ////
-    GroupCombinationState state = u_groupCombinationStates[pcSprite.groupCombinationIndex];
-    objectPosition = state.positionalTransform * pcSprite.startPosition + state.offset;
+    GroupCombinationState state = u_groupCombinationStates[groupCombinationIndex];
+
+    objectPosition = state.positionalTransform * startPosition + state.offset;
 
     if (!isObjectOnScreen())
         return;
+
+    uint spriteIndex = u_spriteRemapIndicies[preCulledSpriteIndex];
 
     InputSprite sprite = u_inputSprites[spriteIndex];
     objectIndex = sprite.objectIndex;
@@ -105,15 +109,15 @@ void processSprite(uint spriteIndex) {
         return;
 
     //// SAVE DATA INTO RAW SPRITE BUFFER ////
-    u_rawSprites[spriteIndex].position = objectPosition;
-    u_rawSprites[spriteIndex].localTransform = objectLocalTransform;
-    u_rawSprites[spriteIndex].color = color;
+    RawSprites.position[spriteIndex] = objectPosition;
+    RawSprites.localTransform[spriteIndex] = objectLocalTransform;
+    RawSprites.color[spriteIndex] = color;
 
     //// WRITE THE SPRITE INDICIES ////
     uint indexEnd = sprite.indexStart + sprite.indexCount;
 
     for (uint i = sprite.indexStart; i < indexEnd; i++) {
-        u_culledIndicies[culledIndexBufferOutputIndex] = u_inputIndicies[i];
+        u_culledTriIndicies[culledIndexBufferOutputIndex] = i;//u_inputIndicies[i];
         culledIndexBufferOutputIndex++;
     }
 }
@@ -126,11 +130,10 @@ void main() {
     culledIndexBufferOutputIndex = workGroup.culledIndexBufferOutputIndex;
 
     for (uint i = workGroup.inputSpriteStart; i < workGroup.inputSpriteEnd; i++)
-        processSprite(u_spriteRemapIndicies[i]);
+        processSprite(i);
 
     //// WRITE THE DRAW COMMAND ////
-    u_drawCommands[workGroupIndex].count = culledIndexBufferOutputIndex - workGroup.culledIndexBufferOutputIndex;
-    u_drawCommands[workGroupIndex].firstIndex = workGroup.culledIndexBufferOutputIndex;
+    u_drawCommands[workGroupIndex].count = (culledIndexBufferOutputIndex - workGroup.culledIndexBufferOutputIndex) * 3;
 }
 
 //// HELPER FUNCTIONS ////
@@ -140,7 +143,7 @@ bool isObjectOnScreen() {
 
     vec2 screenPos = vec2(dot(u_cameraRight, offset), dot(u_cameraUp, offset));
 
-    const float leeway = 100;
+    const float leeway = 60.0;
 
     return screenPos.x >= -leeway &&
            screenPos.x <= u_cameraSize.x + leeway &&
@@ -151,8 +154,8 @@ bool isObjectOnScreen() {
 float calculateAudioScale() {
     float scale;
     if ((objectFlags & OBJECT_FLAG_CUSTOM_AUDIO_SCALE) != 0) {
-        float minScale = u_objects[objectIndex].audioScaleMin;
-        float maxScale = u_objects[objectIndex].audioScaleMax;
+        float minScale = 1.0;//u_objects[objectIndex].audioScaleMin;
+        float maxScale = 1.0;//u_objects[objectIndex].audioScaleMax;
         scale = (u_audioScale - 0.1) * (maxScale - minScale) + minScale;
     } else
         scale = u_audioScale;
@@ -179,10 +182,10 @@ vec2 calculateInvisibleBlockOpacity() {
     float someScreenLeft = u_screenRight - centerRightX - 90.0;
 
     float fadePosX = objectPosition.x;
-    if (fadePosX <= u_cameraUnzoomedX)
-        fadePosX += u_objects[objectIndex].fadeMargin;
-    else
-        fadePosX -= u_objects[objectIndex].fadeMargin;
+    //if (fadePosX <= u_cameraUnzoomedX)
+    //    fadePosX += u_objects[objectIndex].fadeMargin;
+    //else
+    //    fadePosX -= u_objects[objectIndex].fadeMargin;
     
     float relMod = getRelativeMod(fadePosX, 0.02, 0.014285714, 0.0);
 

@@ -41,9 +41,8 @@ namespace fs = std::filesystem;
 // #define BISMUTH_ASSERT(COND) { if (!(COND)) geode::log::error("{}:{}: Assertion failed: {}", fs::path(__FILE__).filename(), __LINE__, #COND); }
 #define BISMUTH_ASSERT(COND)
 
-// TODO: Figure out how to set usize to the pointer size of this machine's architecture
-using usize = u64;
-using isize = i64;
+using usize = uintptr_t;
+using isize = intptr_t;
 
 template <typename T>
 using UPtr = std::unique_ptr<T>;
@@ -65,6 +64,11 @@ extern std::chrono::steady_clock::time_point modStartTime;
 
 inline u64 getTime() {
     return (std::chrono::high_resolution_clock::now() - modStartTime).count();
+}
+
+inline usize alignUp(usize value, usize align) {
+    usize rem = value % align;
+    return rem ? value + (align - rem) : value;
 }
 
 inline bool isNVidiaGPU() {

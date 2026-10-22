@@ -1,17 +1,11 @@
 #include "ObjectSpriteSorter.hpp"
 #include "Renderer.hpp"
 
-SortedObjectBatch::~SortedObjectBatch() {
-    if (spriteRemapBuffer)
-        Buffer::destroy(spriteRemapBuffer);
-    if (workGroupBuffer)
-        Buffer::destroy(workGroupBuffer);
-}
-
 void SortedObjectBatch::bindBuffers() {
     spriteRemapBuffer->bindAsStorageBuffer(SPRITE_REMAP_BUFFER_BINDING);
     workGroupBuffer->bindAsStorageBuffer(WORK_GROUP_BUFFER_BINDING);
     drawCommandBuffer->bindAsStorageBuffer(DRAW_COMMAND_BUFFER_BINDING);
+    preCulledSpritesBuffer->bind();
 }
 
 void ObjectSpriteSorter::addSprite(
@@ -19,7 +13,7 @@ void ObjectSpriteSorter::addSprite(
     cocos2d::CCSprite* sprite,
     SpriteType type,
     u32 inputSpriteIndex,
-    u32 vertexCount
+    u32 triCount
 ) {
     spriteEntries.push_back({
         .zOrder = object->getObjectZOrder(),
@@ -27,7 +21,8 @@ void ObjectSpriteSorter::addSprite(
         .spriteSheet = ObjectUtils::getSpritesheetOfObject(object, type),
         .colorChannelId = (u16)ObjectUtils::getSpriteColorChannel(type, object, sprite),
         .inputSpriteIndex = inputSpriteIndex,
-        .vertexCount = vertexCount
+        .triCount = triCount,
+        .object = object
     });
 }
 
@@ -61,6 +56,9 @@ UPtr<SortedObjectBatch> ObjectSpriteSorter::generateSortedBatch() {
     u32 outIndex = 0;
     std::map<LayerKey, WorkGroupRange> workGroupRangesPerLayerKey;
 
+    preCulledSprites = PreCulledSprites::Buffer::create(spriteEntries.size(), GL_STATIC_DRAW);
+    currentSpriteIndex = 0;
+
     for (auto& [key, layer] : sortedSpriteLayers) {
         // log::info("Process layer: {}", key.toString());
         u32 workGroupStartIndex = workGroups.size();
@@ -78,7 +76,7 @@ UPtr<SortedObjectBatch> ObjectSpriteSorter::generateSortedBatch() {
     log::info("Approx sprites per work group: {}", approxSpritesPerWorkGroup);
     log::info("Work group count: {}", workGroups.size());
 
-    Buffer* spriteRemapBuffer = Buffer::createStaticDraw(
+    auto spriteRemapBuffer = Buffer::createStaticDraw(
         "Sprite remap buffer",
         spriteRemap.data(),
         spriteRemap.size() * sizeof(u32)
@@ -87,37 +85,47 @@ UPtr<SortedObjectBatch> ObjectSpriteSorter::generateSortedBatch() {
     if (!spriteRemapBuffer)
         return nullptr;
 
-    Buffer* workGroupBuffer = Buffer::createStaticDraw(
+    auto workGroupBuffer = Buffer::createStaticDraw(
         "Work group buffer",
         workGroups.data(),
         workGroups.size() * sizeof(WorkGroup)
     );
 
-    if (!workGroupBuffer) {
-        Buffer::destroy(spriteRemapBuffer);
+    if (!workGroupBuffer)
         return nullptr;
-    }
+
+    // auto preCulledSpritesBuffer = Buffer::createStaticDraw("Pre-culled sprites buffer", preCulledSprites.data(), preCulledSprites.size() * sizeof(PreCulledSprite));
+    // preCulledSprites.clear();
+
+    // if (!preCulledSpritesBuffer)
+    //     return nullptr;
 
     std::vector<DrawCommand> drawCommands;
     drawCommands.resize(workGroups.size());
 
-    for (auto& cmd : drawCommands) {
-        cmd.baseInstance = 0;
-        cmd.baseVertex = 0;
-        cmd.instanceCount = 1;
+    for (usize i = 0; i < workGroups.size(); i++) {
+        drawCommands[i].baseInstance  = 0;
+        drawCommands[i].instanceCount = 1;
+        drawCommands[i].first = workGroups[i].culledIndexBufferOutputIndex * 3;
     }
 
-    Buffer* drawCommandBuffer = Buffer::createGPUExclusive(
+    auto drawCommandBuffer = Buffer::createGPUExclusive(
         "Draw command buffer",
         workGroups.size() * sizeof(DrawCommand)
     );
 
+    if (!drawCommandBuffer)
+        return nullptr;
+
     drawCommandBuffer->write(drawCommands.data(), drawCommandBuffer->getSize());
 
+    preCulledSprites->flushAllAndUnmap();
+
     return std::make_unique<SortedObjectBatch>(
-        spriteRemapBuffer,
-        workGroupBuffer,
-        drawCommandBuffer,
+        std::move(spriteRemapBuffer),
+        std::move(workGroupBuffer),
+        std::move(drawCommandBuffer),
+        std::move(preCulledSprites),
         workGroups.size(),
         workGroupRangesPerLayerKey
     );
@@ -134,6 +142,8 @@ void ObjectSpriteSorter::generateWorkGroupsForLayer(
 
     const auto& sprites = sortedSpriteLayers[layerKey];
 
+    auto& gman = Renderer::get()->getGroupManager();
+
     u32 i = 0;
     while (i < sprites.size()) {
         u32 spritesToAdd = spritesPerWorkGroup;
@@ -144,7 +154,10 @@ void ObjectSpriteSorter::generateWorkGroupsForLayer(
         while (spritesToAdd > 0 && i < sprites.size()) {
             auto sprite = sprites[i];
             inputSpriteIndiciesOut.push_back(sprite->inputSpriteIndex);
-            culledIndexBufferOutputIndex += sprite->vertexCount;
+            culledIndexBufferOutputIndex += sprite->triCount;
+            *preCulledSprites->at(currentSpriteIndex).groupCombinationIndex = gman.getGroupCombinationIndexForObject(sprite->object);
+            *preCulledSprites->at(currentSpriteIndex).startPosition = ccPointToGLM(sprite->object->m_startPosition);
+            currentSpriteIndex++;
             spritesToAdd--;
             i++;
         }

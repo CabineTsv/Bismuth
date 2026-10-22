@@ -69,7 +69,7 @@ void Buffer::flush(usize offset, usize size) {
     }
 }
 
-Buffer* Buffer::create(const char* name, usize size, GLenum usage) {
+UPtr<Buffer> Buffer::create(const char* name, usize size, GLenum usage) {
     u32 buffer;
     glGenBuffers(1, &buffer);
 
@@ -83,7 +83,7 @@ Buffer* Buffer::create(const char* name, usize size, GLenum usage) {
 
     glBindBuffer(GL_ARRAY_BUFFER, previouslyBoundBuffer);
 
-    auto ret  = new Buffer();
+    auto ret = std::make_unique<Buffer>();
     ret->id = buffer;
     ret->size = size;
     ret->shouldMap = Mod::get()->getSettingValue<bool>("use_mapped_buffers");

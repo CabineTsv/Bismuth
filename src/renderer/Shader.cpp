@@ -122,6 +122,8 @@ static std::optional<std::string> preprocessShader(EShLanguage stage, const std:
         return std::nullopt;
     }
 
+    log::info("{} preprocessed", name);
+
     removeLinesStartingWith(codeOut, "#extension GL_ARB_shading_language_include");
 
     if (!isNVidiaGPU())
@@ -139,6 +141,8 @@ static std::optional<std::string> preprocessShader(const fs::path& path, std::st
     
     auto shader = preprocessShader(stage, preCode + source.value(), path.string());
     if (!shader) return std::nullopt;
+
+    // log::info("{}:\n{}\n", path, shader.value());
 
     return shader.value();
 }
@@ -169,40 +173,6 @@ static u32 createShader(i32 type, const char* source) {
     return shader;
 }
 
-Shader* Shader::create(const ShaderSources& sources) {
-    u32 vertexShader   = createShader(GL_VERTEX_SHADER, sources.vertexSource.c_str());
-    u32 fragmentShader = createShader(GL_FRAGMENT_SHADER, sources.fragmentSource.c_str());
-
-    if (!vertexShader || !fragmentShader) {
-        if (vertexShader)   glDeleteShader(vertexShader);
-        if (fragmentShader) glDeleteShader(fragmentShader);
-        return nullptr;
-    }
-
-    u32 program = glCreateProgram();
-    glAttachShader(program, vertexShader);
-    glAttachShader(program, fragmentShader);
-    glLinkProgram(program);
-
-    int success;
-    glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success) {
-        char log[512];
-        glGetProgramInfoLog(program, 512, NULL, log);
-        geode::log::error("Failed to link shader program:");
-        printErrorLog(log);
-        glDeleteProgram(program);
-        return nullptr;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-    
-    Shader* shader = new Shader();
-    shader->program = program;
-    return shader;
-}
-
 static u32 createShaderProgram(const std::vector<u32>& shaders) {
     u32 program = glCreateProgram();
     for (auto shader : shaders)
@@ -230,7 +200,7 @@ static inline std::string generatePreCode(std::map<std::string, std::string> mac
     return preCode;
 }
 
-Shader* Shader::create(
+UPtr<Shader> Shader::create(
     const fs::path& vertexPath,
     const fs::path& fragmentPath,
     std::map<std::string, std::string> macroVariables
@@ -260,12 +230,12 @@ Shader* Shader::create(
     if (program == 0)
         return nullptr;
 
-    Shader* shader = new Shader();
-    shader->program = program;
-    return shader;
+    auto ret = std::make_unique<Shader>();
+    ret->program = program;
+    return ret;
 }
 
-Shader* Shader::createCompute(const fs::path& path, std::map<std::string, std::string> macroVariables) {
+UPtr<Shader> Shader::createCompute(const fs::path& path, std::map<std::string, std::string> macroVariables) {
     auto preCode = generatePreCode(macroVariables);
 
     auto source = preprocessShader(path, preCode, EShLangCompute);
@@ -283,7 +253,7 @@ Shader* Shader::createCompute(const fs::path& path, std::map<std::string, std::s
     if (program == 0)
         return nullptr;
 
-    Shader* ret = new Shader();
+    auto ret = std::make_unique<Shader>();
     ret->program = program;
     return ret;
 }

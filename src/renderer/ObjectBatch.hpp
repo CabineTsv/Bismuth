@@ -20,21 +20,21 @@ using namespace geode;
     macro so you don't have duplicate code
     with the and the attrib pointer calls.
 
-    ATTRIB(attributeLocation, type, name)
+    Attrib_(attributeLocation, type, name)
 
     NOTE: The positionOffset attribute is this
           vertex' offset from the position of
           the object this sprite belongs to.
-*/
-#define OBJECT_VERTEX_ATTRIBUTES(ATTRIB) \
-    ATTRIB(0, vec2, positionOffset) \
-    ATTRIB(1, vec2, texCoord) \
-    ATTRIB(2, u32,  spriteIndex)
+
+#define OBJECT_VERTEX_ATTRIBUTES(Attrib_) \
+    Attrib_(0, vec2, positionOffset) \
+    Attrib_(1, vec2, texCoord) \
+    Attrib_(2, u32,  spriteIndex)
 
 ////////////////////////////////////////////////
 
-#define VERTEX_ATTRIBUTE_AS_STRUCT_MEMBER(ID, TYPE, NAME) \
-    TYPE NAME;
+#define VERTEX_ATTRIBUTE_AS_STRUCT_MEMBER(Id_, Type_, Name_) \
+    Type_ Name_;
 
 #define VERTICIES_PER_QUAD 4
 #define INDICIES_PER_QUAD  6
@@ -42,22 +42,7 @@ using namespace geode;
 struct ObjectVertex {
     OBJECT_VERTEX_ATTRIBUTES(VERTEX_ATTRIBUTE_AS_STRUCT_MEMBER);
 };
-
-struct ObjectQuad {
-    union {
-        ObjectVertex verticies[VERTICIES_PER_QUAD];
-        struct {
-            ObjectVertex bl;
-            ObjectVertex br;
-            ObjectVertex tl;
-            ObjectVertex tr;
-        };
-    };
-};
-
-struct ObjectIndicies {
-    u32 indicies[INDICIES_PER_QUAD];
-};
+*/
 
 ////////////////////////////////////////////////
 
@@ -92,7 +77,7 @@ public:
     );
 
     void writeSpriteVertex(glm::vec2 pos);
-    void writeSpriteIndex(u32 index);
+    // void writeSpriteIndex(u32 index);
 
     void writeSpriteMeshFromConvexList(const ConvexList& list);
 
@@ -114,17 +99,10 @@ public:
         indexBuffer->bindAs(GL_ELEMENT_ARRAY_BUFFER);
     }
 
-    inline usize getVertexBufferSize() {
-        return vertexCount * sizeof(ObjectVertex);
-    }
-
-    inline void setSpriteSheetFilter(SpriteSheet sheet) {
-        spriteSheetFilter = sheet;
-    }
-
-    inline const std::set<LayerKey>& getUsedLayerIds() {
-        return usedLayerKeys;
-    }
+    inline usize getVertexBufferSize() { return vertexCount * sizeof(ObjectVertex); }
+    inline void setSpriteSheetFilter(SpriteSheet sheet) { spriteSheetFilter = sheet; }
+    inline const std::set<LayerKey>& getUsedLayerIds() { return usedLayerKeys; }
+    inline usize getSpriteCount() { return spriteSorter.getSpriteCount(); }
 
     void predraw();
 
@@ -139,14 +117,13 @@ private:
     SpriteSheet spriteSheetFilter = (SpriteSheet)-1;
 
     // Static buffers
-    Buffer* vertexBuffer = nullptr;
-    Buffer* indexBuffer = nullptr;
-    Buffer* inputSpriteBuffer = nullptr;
-    Buffer* preCulledSpritesBuffer = nullptr;
+    UPtr<Buffer> vertexBuffer = nullptr;
+    UPtr<Buffer> indexBuffer = nullptr;
+    UPtr<Buffer> inputSpriteBuffer = nullptr;
 
     // GPU buffers
-    Buffer* rawSpriteBuffer = nullptr;
-    Buffer* culledIndexBuffer = nullptr;
+    UPtr<RawSprites::Buffer> rawSpriteBuffer = nullptr;
+    UPtr<Buffer> culledIndexBuffer = nullptr;
 
     GPUTimer cullingComputeShaderTimer { "Culling compute shader time" };
 
@@ -155,6 +132,8 @@ private:
     ObjectSpriteSorter spriteSorter;
     UPtr<SortedObjectBatch> sortedBatch;
 
+    usize spriteCount = 0;
+
     std::vector<ObjectVertex> verticies;
     u32 vertexCount = 0;
 
@@ -162,7 +141,7 @@ private:
     u32 indexCount = 0;
 
     std::vector<InputSprite> inputSprites;
-    std::vector<PreCulledSprite> preCulledSprites;
+    // std::vector<PreCulledSprite> preCulledSprites;
 
     std::set<LayerKey> usedLayerKeys;
 

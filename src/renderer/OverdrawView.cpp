@@ -37,9 +37,6 @@ OverdrawView::OverdrawView(Renderer& renderer)
 OverdrawView::~OverdrawView() {
     instance = nullptr;
 
-    if (shader)
-        Shader::destroy(shader);
-
     if (stencilTexture != 0)
         glDeleteTextures(1, &stencilTexture);
 }

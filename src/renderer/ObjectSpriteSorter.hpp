@@ -12,15 +12,14 @@ struct WorkGroupRange {
 };
 
 struct SortedObjectBatch {
-    Buffer* spriteRemapBuffer;
-    Buffer* workGroupBuffer;
-    Buffer* drawCommandBuffer;
+    UPtr<Buffer> spriteRemapBuffer;
+    UPtr<Buffer> workGroupBuffer;
+    UPtr<Buffer> drawCommandBuffer;
+    UPtr<PreCulledSprites::Buffer> preCulledSpritesBuffer;
 
     u32 workGroupCount;
 
     std::map<LayerKey, WorkGroupRange> workGroupRangePerLayerKey;
-
-    ~SortedObjectBatch();
 
     void bindBuffers();
 };
@@ -32,12 +31,16 @@ public:
         cocos2d::CCSprite* sprite,
         SpriteType type,
         u32 inputSpriteIndex,
-        u32 vertexCount
+        u32 triCount
     );
 
     void sortForCurrentBlendingStates();
 
     UPtr<SortedObjectBatch> generateSortedBatch();
+
+    inline usize getSpriteCount() const {
+        return spriteEntries.size();
+    }
 
 private:
     void generateWorkGroupsForLayer(
@@ -55,13 +58,18 @@ private:
         SpriteSheet spriteSheet;
         u16 colorChannelId;
         u32 inputSpriteIndex;
-        u32 vertexCount;
+        u32 triCount;
+        GameObject* object;
 
         LayerKey getFullLayerKey() const;
     };
 
     std::vector<SpriteEntry> spriteEntries;
     std::vector<SpriteEntry*> sortedSpriteEntries;
+
+    usize currentSpriteIndex;
+    
+    UPtr<PreCulledSprites::Buffer> preCulledSprites;
 
     std::unordered_map<LayerKey, std::vector<SpriteEntry*>> sortedSpriteLayers;
 };

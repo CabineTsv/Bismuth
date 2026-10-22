@@ -45,5 +45,5 @@ private:
 
     std::vector<u8> stencilBuffer;
 
-    Shader* shader = nullptr;
+    UPtr<Shader> shader = nullptr;
 };

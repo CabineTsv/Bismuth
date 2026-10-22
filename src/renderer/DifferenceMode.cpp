@@ -8,9 +8,6 @@ using namespace geode::prelude;
 
 DifferenceMode::~DifferenceMode() {
     destroyFramebuffers();
-
-    if (shader)
-        Shader::destroy(shader);
 }
 
 void DifferenceMode::drawSceneHook() {

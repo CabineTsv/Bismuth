@@ -73,17 +73,14 @@ GroupCombination::operator std::string() const {
     return ret + "]";
 }
 
-GroupManager::~GroupManager() {
-    if (groupStateBuffer) {
-        groupStateBuffer->unmap();
-        Buffer::destroy(groupStateBuffer);
-    }
-}
+GroupManager::~GroupManager() {}
 
 static std::set<GameObject*> dobjects;
 
 void GroupManager::initWithObjects(cocos2d::CCArray* objects) {
-    GroupCombinationIndex groupCombIndex = 0;
+    auto emptyGroupComb = GroupCombination(std::vector<GroupID>{});
+    addGroupCombination(emptyGroupComb, 0);
+    GroupCombinationIndex groupCombIndex = 1;
 
     for (auto object : CCArrayExt<GameObject*>(objects)) {
         std::optional<GroupID> targetGroupId = getTargetGroupIdOfTransformingTrigger(object);
@@ -158,7 +155,6 @@ GroupCombinationIndex GroupManager::getGroupCombinationIndexForObject(GameObject
 
     auto it = groupCombinationIndicies.find(comb);
     assert(it != groupCombinationIndicies.end());
-
     return it->second;
 }
 

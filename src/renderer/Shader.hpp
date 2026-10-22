@@ -11,23 +11,16 @@ struct ShaderSources {
 };
 
 class Shader {
-private:
+public:
     ~Shader();
 
-public:
-    static Shader* create(const ShaderSources& sources);
-
-    static Shader* create(
+    static UPtr<Shader> create(
         const fs::path& vertexPath,
         const fs::path& fragmentPath,
         std::map<std::string, std::string> macroVariables = {}
     );
 
-    static Shader* createCompute(const fs::path& path, std::map<std::string, std::string> macroVariables = {});
-
-    static inline void destroy(Shader* shader) {
-        delete shader;
-    }
+    static UPtr<Shader> createCompute(const fs::path& path, std::map<std::string, std::string> macroVariables = {});
 
     inline void use() {
         glUseProgram(program);
